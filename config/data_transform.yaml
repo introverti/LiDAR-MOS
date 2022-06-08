@@ -1,0 +1,35 @@
+# Developed by: Tianyun Xuan
+# Reorder Waymo open dataset to Kitti format
+# --------------------------------------------------------------------
+
+# General parameters
+debug: False
+# number of frames for training, -1 uses all frames
+num_frames: -1
+# normalize/scale the difference with corresponding range value
+normalize: True
+# use the last n frame to calculate the difference image
+num_last_n: 1
+
+# Inputs
+# inno or waymo
+type: "waymo"
+# the folder of Waymo or inno data
+source_folder: 'data/waymo/00000'
+# Waymo have 5 liadrs, we only use the center one
+lidar_name: 0
+
+# Outputs
+# the suffix should be the same as num_last_n!
+Kitti_format_data_folder: 'data/own/sequences'
+visualize: False
+
+# range image parameters
+range_image:
+  height: 64
+  width: 2048
+  # TOP [-17.6, +2.4]
+  fov_up: 18
+  fov_down: 3
+  max_range: 50.0
+  min_range: 2.0
