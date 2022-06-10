@@ -50,7 +50,7 @@ color_map: # bgr
   21: [80, 240, 150]
   22: [150, 240, 255]
   31: [0, 0, 255]  # lidar-mos moving
-  32: [0, 0, 0]    # lidar-mos static
+  32: [255, 0, 0]    # lidar-mos static
 content: # as a ratio with the total number of points
   0: 6.32052376e-03
   1: 8.96972519e-02
