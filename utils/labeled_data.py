@@ -6,8 +6,8 @@ from utils import *
 import shutil
 import yaml
 
-WAYMO_DATASET_ADDR = "/home/xavier/deeplearning/LiDAR-MOS/xaiver/data/own/sequences"
-LABELED_DATASET_ADDR = "/home/xavier/deeplearning/LiDAR-MOS/xaiver/data/labeled/sequences"
+WAYMO_DATASET_ADDR = "/home/xavier/deeplearning/LiDAR-MOS/LiDAR-MOS-WAYMO/data/own/sequences"
+LABELED_DATASET_ADDR = "/home/xavier/deeplearning/LiDAR-MOS/LiDAR-MOS-WAYMO/data/labeled/sequences"
 
 if __name__ == '__main__':
     assert(exist(WAYMO_DATASET_ADDR))

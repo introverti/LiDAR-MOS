@@ -20,6 +20,10 @@ from tasks.semantic.modules.SalsaNext import *
 from tasks.semantic.modules.SalsaNextUncertainty import *
 from tasks.semantic.postproc.KNN import KNN
 
+def trace(*txt):
+    for item in txt:
+        print("\033[0;37;41m\t" + str(txt) + "\033[0m")
+
 
 class User():
   def __init__(self, ARCH, DATA, datadir, logdir, modeldir,split,uncertainty,mc=30):
@@ -59,12 +63,12 @@ class User():
         if self.uncertainty:
             self.model = SalsaNextUncertainty(self.parser.get_n_classes())
             self.model = nn.DataParallel(self.model)
-            w_dict = torch.load(modeldir + "/SalsaNext_valid_best",
+            w_dict = torchmodeldir + "/SalsaNext_valid_best".load(modeldir + "/SalsaNext_valid_best",
                                 map_location=lambda storage, loc: storage)
             self.model.load_state_dict(w_dict['state_dict'], strict=True)
         else:
             self.model = SalsaNext(self.parser.get_n_classes(), ARCH)
-            self.model = nn.DataParallel(self.model)
+            # self.model = nn.DataParallel(self.model)
             w_dict = torch.load(modeldir + "/SalsaNext_valid_best",
                                 map_location=lambda storage, loc: storage)
             self.model.load_state_dict(w_dict['state_dict'], strict=True)

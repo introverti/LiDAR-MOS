@@ -21,7 +21,7 @@ if __name__ == '__main__':
         '--config', '-c',
         type=str,
         required=False,
-        default="config/labels/semantic-kitti.yaml",
+        default="config/labels/semantic-waymo-mos.yaml",
         help='Dataset config file. Defaults to %(default)s',
     )
     parser.add_argument(
@@ -94,7 +94,7 @@ if __name__ == '__main__':
 
     # does sequence folder exist?
     scan_paths = os.path.join(FLAGS.dataset, "sequences",
-                              FLAGS.sequence, "velodyne")
+                              FLAGS.sequence, "lidars")
     if os.path.isdir(scan_paths):
         print("Sequence folder exists! Using sequence from %s" % scan_paths)
     else:

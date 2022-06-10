@@ -221,5 +221,6 @@ def range_projection(current_vertex, proj_H=64, proj_W=900, fov_up=3.0, fov_down
     proj_intensity[proj_y, proj_x] = intensity,
     return proj_vertex
 
-def trace(txt):
-    print("\033[0;37;41m\t" + str(txt) + "\033[0m")
+def trace(*txt):
+    for item in txt:
+        print("\033[0;37;41m\t" + str(txt) + "\033[0m")

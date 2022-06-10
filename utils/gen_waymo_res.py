@@ -132,8 +132,8 @@ if __name__ == '__main__':
                 if normalize:
                     difference = np.abs(
                         current_range[valid_mask] - last_range_transformed[valid_mask]) / current_range[valid_mask]
-
                 diff_image[valid_mask] = difference
+                np.save(file_name, diff_image)
                 # debug
                 if debug:
                     fig, axs = plt.subplots(3)
@@ -153,5 +153,3 @@ if __name__ == '__main__':
                         visualization_folder, str(frame_idx).zfill(6))
                     plt.savefig(image_name)
                     plt.close()
-
-                np.save(file_name, diff_image)

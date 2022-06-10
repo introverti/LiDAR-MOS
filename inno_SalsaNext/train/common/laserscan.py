@@ -116,6 +116,30 @@ class LaserScan:
 
         self.set_points(points, remissions)
 
+    def open_scan_vis(self, filename):
+        """ Open raw scan and fill in attributes
+        """
+        # reset just in case there was an open structure
+        self.reset()
+
+        # check filename is string
+        if not isinstance(filename, str):
+            raise TypeError("Filename should be string type, "
+                            "but was {type}".format(type=str(type(filename))))
+
+        # check extension is a laserscan
+        if not any(filename.endswith(ext) for ext in self.EXTENSIONS_SCAN):
+            raise RuntimeError("Filename extension is not valid scan file.")
+
+        # if all goes well, open pointcloud
+        scan = np.load(filename)
+        scan = scan.reshape((-1, 3))
+
+        # put in attribute
+        points = scan[:, 0:3]    # get xyz
+        remissions = np.ones(points.shape[0])  # get remission
+        self.set_points(points, remissions)
+
     def set_points(self, points, remissions=None):
         """ Set scan attributes (instead of opening from file)
         """
@@ -305,6 +329,30 @@ class SemLaserScan(LaserScan):
         assert(label.shape[1] == 2)
         self.set_label(label)
 
+    def open_pre_label(self, filename):
+        """ Open raw scan and fill in attributes
+        """
+        # check filename is string
+        if not isinstance(filename, str):
+            raise TypeError("Filename should be string type, "
+                            "but was {type}".format(type=str(type(filename))))
+
+        # check extension is a laserscan
+        if not any(filename.endswith(ext) for ext in self.EXTENSIONS_LABEL):
+            raise RuntimeError("Filename extension is not valid label file.")
+
+        # if all goes well, open label
+        # (Xavier: replaced .label with .npy)
+        label = np.fromfile(filename, dtype=np.uint32)
+        # label = label.reshape(-1, 1)
+
+
+        if self.drop_points is not False:
+            label = np.delete(label, self.points_to_drop, axis=0)
+        # set it
+        # assert(label.shape[1] == 1)
+        self.set_pre_label(label)
+        
     def set_label(self, label):
         """ Set points for label not from file but from np
         """
@@ -317,6 +365,27 @@ class SemLaserScan(LaserScan):
         if label.shape[0] == self.points.shape[0]:
             self.sem_label = label[:, 1]
             self.inst_label = label[:, 0]
+        else:
+            print("Points shape: ", self.points.shape)
+            print("Label shape: ", label.shape)
+            raise ValueError(
+                "Scan and Label don't contain same number of points")
+
+        if self.project:
+            self.do_label_projection()
+
+    def set_pre_label(self, label):
+        """ Set points for label not from file but from np
+        """
+        # check label makes sense
+        if not isinstance(label, np.ndarray):
+            raise TypeError("Label should be numpy array")
+
+        # only fill in attribute if the right size
+        # (Xavier : modified instance and sematic)
+        if label.shape[0] == self.points.shape[0]:
+            self.sem_label = label
+            self.inst_label = np.ones(label.shape, dtype=np.uint32)
         else:
             print("Points shape: ", self.points.shape)
             print("Label shape: ", label.shape)
@@ -348,4 +417,3 @@ class SemLaserScan(LaserScan):
         # instances
         self.proj_inst_label[mask] = self.inst_label[self.proj_idx[mask]]
         self.proj_inst_color[mask] = self.inst_color_lut[self.inst_label[self.proj_idx[mask]]]
-
