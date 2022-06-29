@@ -15,7 +15,7 @@ num_last_n: 1
 # inno or waymo
 type: "waymo"
 # the folder of Waymo or inno data
-source_folder: 'data/waymo/00000'
+source_folder: 'data/waymo/'
 # Waymo have 5 liadrs, we only use the center one
 lidar_name: 0
 

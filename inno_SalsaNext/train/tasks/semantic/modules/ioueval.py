@@ -27,7 +27,7 @@ class iouEval:
         self.ones = None
         self.last_scan_size = None  # for when variable scan size is used
 
-    def addBatch(self, x, y):  # x=preds, y=targets
+    def addBatch(self, x, y):  # x=preds, y=targets idem: argmax, proj_labels
         # if numpy, pass to pytorch
         # to tensor
         if isinstance(x, np.ndarray):
@@ -35,25 +35,24 @@ class iouEval:
         if isinstance(y, np.ndarray):
             y = torch.from_numpy(np.array(y)).long().to(self.device)
 
-        # sizes should be "batch_size x H x W"
+        # torch.Size[batch_size x H x W]
         x_row = x.reshape(-1)  # de-batchify
         y_row = y.reshape(-1)  # de-batchify
 
         # idxs are labels and predictions
+        # torch.Size[2, batch_size x H x W]
         idxs = torch.stack([x_row, y_row], dim=0)
 
         # ones is what I want to add to conf when I
         if self.ones is None or self.last_scan_size != idxs.shape[-1]:
+            # torch.Size[batch_size x H x W]
             self.ones = torch.ones((idxs.shape[-1]), device=self.device).long()
             self.last_scan_size = idxs.shape[-1]
 
-        # make confusion matrix (cols = gt, rows = pred)
+        # make confusion matrix (rows = pred, cols = gt)
+        # tensor.index_put_(indices, values, accumulate=True) is equivalent to tensor[indices] += values
         self.conf_matrix = self.conf_matrix.index_put_(
             tuple(idxs), self.ones, accumulate=True)
-
-        # print(self.tp.shape)
-        # print(self.fp.shape)
-        # print(self.fn.shape)
 
     def getStats(self):
         # remove fp and fn from confusion on the ignore classes cols and rows
@@ -62,18 +61,24 @@ class iouEval:
         conf[:, self.ignore] = 0
 
         # get the clean stats
-        tp = conf.diag()
-        fp = conf.sum(dim=1) - tp
-        fn = conf.sum(dim=0) - tp
+        # (rows = pred, cols = gt)
+        tp = conf.diag()          # true positive
+        fp = conf.sum(dim=1) - tp # false positive || over all columns  == for each row
+        fn = conf.sum(dim=0) - tp # false negative || over all rows == for each column
         return tp, fp, fn
 
     def getIoU(self):
         tp, fp, fn = self.getStats()
+        # print(tp.shape)
+        # print(fp.shape)
+        # print(fn.shape)
+        # torch.Size[self.n_classes]
         intersection = tp
         union = tp + fp + fn + 1e-15
         iou = intersection / union
         iou_mean = (intersection[self.include] / union[self.include]).mean()
-        return iou_mean, iou  # returns "iou mean", "iou per class" ALL CLASSES
+        # returns "iou mean", "iou per class" ALL CLASSES idem: jaccard, class_jaccard
+        return iou_mean, iou
 
     def getacc(self):
         tp, fp, fn = self.getStats()

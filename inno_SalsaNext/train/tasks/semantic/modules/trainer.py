@@ -22,9 +22,11 @@ from tasks.semantic.modules.SalsaNextAdf import *
 from tasks.semantic.modules.Lovasz_Softmax import Lovasz_softmax
 import tasks.semantic.modules.adf as adf
 
+
 def trace(*txt):
     for item in txt:
         print("\033[0;37;41m\t" + str(txt) + "\033[0m")
+
 
 def keep_variance_fn(x):
     return x + 1e-3
@@ -160,8 +162,13 @@ class Trainer():
             self.model_single = self.model.module  # single model to get weight names
             self.multi_gpu = True
             self.n_gpus = torch.cuda.device_count()
-
-        self.criterion = nn.NLLLoss(weight=self.loss_w, reduction='mean').to(self.device)
+        
+        # loss defined here
+        # self.criterion = nn.NLLLoss(
+        #     weight=self.loss_w, reduction='mean').to(self.device)
+        # (Xavier replace nllloss by crossentropyloss)
+        self.criterion = nn.CrossEntropyLoss(
+            weight=self.loss_w, reduction='mean').to(self.device)
         self.ls = Lovasz_softmax(ignore=0).to(self.device)
         self.SoftmaxHeteroscedasticLoss = SoftmaxHeteroscedasticLoss().to(self.device)
         # loss as dataparallel too (more images in batch)
@@ -359,6 +366,8 @@ class Trainer():
     def train_epoch(self, train_loader, model, criterion, optimizer, epoch, evaluator, scheduler, color_fn, report=10,
                     show_scans=False):
         losses = AverageMeter()
+        jaccs = AverageMeter()
+        wces = AverageMeter()
         acc = AverageMeter()
         iou = AverageMeter()
         hetero_l = AverageMeter()
@@ -395,8 +404,12 @@ class Trainer():
             else:
                 output = model(in_vol)
                 # NLLLoss + Lovasz_softmax
-                loss_m = criterion(torch.log(output.clamp(
-                    min=1e-8)), proj_labels) + self.ls(output, proj_labels.long())
+                wce = criterion(torch.log(output.clamp(
+                    min=1e-8)), proj_labels)
+                jacc = self.ls(output, proj_labels.long())
+                loss_m = wce + jacc
+                # loss_m = criterion(torch.log(output.clamp(
+                #     min=1e-8)), proj_labels) + self.ls(output, proj_labels.long())
 
             loss_m = loss_m.mean()
 
@@ -418,6 +431,8 @@ class Trainer():
                 jaccard, class_jaccard = evaluator.getIoU()
 
             losses.update(loss.item(), in_vol.size(0))
+            jaccs.update(jacc.mean().item(), in_vol.size(0))
+            wces.update(wce.mean().item(), in_vol.size(0))
             acc.update(accuracy.item(), in_vol.size(0))
             iou.update(jaccard.item(), in_vol.size(0))
 
@@ -495,25 +510,29 @@ class Trainer():
                           'Update: {umean:.3e} mean,{ustd:.3e} std | '
                           'Epoch: [{0}][{1}/{2}] | '
                           'Time {batch_time.val:.3f} ({batch_time.avg:.3f}) | '
-                          'Data {data_time.val:.3f} ({data_time.avg:.3f}) | '
+                          # 'Data {data_time.val:.3f} ({data_time.avg:.3f}) | '
+                          'Jacc {jacc.val:.4f} ({jacc.avg:.4f}) | '
+                          'WCE {wce.val:.4f} ({wce.avg:.4f}) | '
                           'Loss {loss.val:.4f} ({loss.avg:.4f}) | '
                           'acc {acc.val:.3f} ({acc.avg:.3f}) | '
                           'IoU {iou.val:.3f} ({iou.avg:.3f}) | [{estim}]'.format(
                               epoch, i, len(train_loader), batch_time=self.batch_time_t,
                               data_time=self.data_time_t, loss=losses, acc=acc, iou=iou, lr=lr,
-                              umean=update_mean, ustd=update_std, estim=self.calculate_estimate(epoch, i)))
+                              umean=update_mean, ustd=update_std, estim=self.calculate_estimate(epoch, i), jacc=jaccs, wce=wces))
 
                     save_to_log(self.log, 'log.txt', 'Lr: {lr:.3e} | '
                                                      'Update: {umean:.3e} mean,{ustd:.3e} std | '
                                                      'Epoch: [{0}][{1}/{2}] | '
                                                      'Time {batch_time.val:.3f} ({batch_time.avg:.3f}) | '
-                                                     'Data {data_time.val:.3f} ({data_time.avg:.3f}) | '
+                                #'Data {data_time.val:.3f} ({data_time.avg:.3f}) | '
+                                                     'Jacc {jacc.val:.4f} ({jacc.avg:.4f}) | '
+                                                     'WCE {wce.val:.4f} ({wce.avg:.4f}) | '
                                                      'Loss {loss.val:.4f} ({loss.avg:.4f}) | '
                                                      'acc {acc.val:.3f} ({acc.avg:.3f}) | '
                                                      'IoU {iou.val:.3f} ({iou.avg:.3f}) | [{estim}]'.format(
                                                          epoch, i, len(train_loader), batch_time=self.batch_time_t,
                                                          data_time=self.data_time_t, loss=losses, acc=acc, iou=iou, lr=lr,
-                                                         umean=update_mean, ustd=update_std, estim=self.calculate_estimate(epoch, i)))
+                                                         umean=update_mean, ustd=update_std, estim=self.calculate_estimate(epoch, i), jacc=jaccs, wce=wces))
 
             # step scheduler
             scheduler.step()

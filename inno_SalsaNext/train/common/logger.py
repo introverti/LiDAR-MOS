@@ -10,7 +10,7 @@ try:
 except ImportError:
     from io import BytesIO  # Python 3.x
 
-def trace (txt):
+def trace (*txt):
     print("\033[0;37;41m\t" + str(txt) + "\033[0m")
 
 class Logger(object):

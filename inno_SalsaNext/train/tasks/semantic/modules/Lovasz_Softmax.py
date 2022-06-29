@@ -39,15 +39,20 @@ def mean(l, ignore_nan=False, empty=0):
     l = iter(l)
     if ignore_nan:
         l = ifilterfalse(isnan, l)
+    # l is the iterator before the fist element
     try:
         n = 1
+        # take the fisrt element
         acc = next(l)
     except StopIteration:
         if empty == 'raise':
             raise ValueError('Empty mean')
         return empty
+    # index start from 2
+    # if l has more than two elements
     for n, v in enumerate(l, 2):
         acc += v
+    # if l has only one element
     if n == 1:
         return acc
     return acc / n
@@ -79,6 +84,7 @@ def lovasz_softmax(probas, labels, classes='present', per_image=False, ignore=No
       ignore: void class labels
     """
     if per_image:
+        # unsqueeze : Returns a new tensor with a dimension of size one inserted at the specified position.
         loss = mean(lovasz_softmax_flat(*flatten_probas(prob.unsqueeze(0), lab.unsqueeze(0), ignore), classes=classes)
                     for prob, lab in zip(probas, labels))
     else:
@@ -93,6 +99,7 @@ def lovasz_softmax_flat(probas, labels, classes='present'):
       labels: [P] Tensor, ground truth labels (between 0 and C - 1)
       classes: 'all' for all, 'present' for classes present in labels, or a list of classes to average.
     """
+    # Returns the total number of elements in the input tensor.
     if probas.numel() == 0:
         # only void pixels, the gradients should be 0
         return probas * 0.
@@ -130,7 +137,9 @@ def flatten_probas(probas, labels, ignore=None):
     labels = labels.view(-1)
     if ignore is None:
         return probas, labels
+    # valid mask
     valid = (labels != ignore)
+    # Returns a tensor with all the dimensions of input of size 1 removed.
     vprobas = probas[valid.nonzero().squeeze()]
     vlabels = labels[valid]
     return vprobas, vlabels

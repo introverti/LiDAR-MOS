@@ -9,8 +9,7 @@ from scipy.spatial.transform import Rotation as R
 
 
 def trace(*txt):
-    for item in txt:
-        print("\033[0;37;41m\t" + str(txt) + "\033[0m")
+    print("\033[0;37;41m\t" + str(txt) + "\033[0m")
 
 
 class LaserScan:
