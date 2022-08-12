@@ -14,18 +14,21 @@ def trace(*txt):
 
 class LaserScan:
     """Class that contains LaserScan with x,y,z,r"""
-    # (Xavier: replaced .bin with .npy and size modified)
+    # (Xavier: replaced .bin with .npy]
     EXTENSIONS_SCAN = ['.npy']
 
-    def __init__(self, project=False, H=64, W=1024, fov_up=3.0, fov_down=-25.0, DA=False, flip_sign=False, rot=False, drop_points=False):
+    # (Xavier: add horizontal fov and nolonger blind it to 360)
+    def __init__(self, project=False, H=64, W=1024, fov_up=15.0, fov_down=-15.0, fov_horizontal=120.0, DA=False, flip_sign=False, rot=False, drop_points=False):
         self.project = project
         self.proj_H = H
         self.proj_W = W
         self.proj_fov_up = fov_up
         self.proj_fov_down = fov_down
+        self.proj_fov_horizontal = fov_horizontal
         self.DA = DA
         self.flip_sign = flip_sign
         self.rot = rot
+        # (Xavier: percentage)
         self.drop_points = drop_points
 
         self.reset()
@@ -71,7 +74,8 @@ class LaserScan:
     def __len__(self):
         return self.size()
 
-    def open_scan(self, filename, from_pose, to_pose, if_transform=True):
+    # (Xaiver: please dont bother me with confused name and re-re-retard transformation)
+    def open_scan(self, filename, pose_to_global, pose_to_local, need_transform=True):
         """ Open raw scan and fill in attributes
         """
         # reset just in case there was an open structure
@@ -86,10 +90,10 @@ class LaserScan:
         if not any(filename.endswith(ext) for ext in self.EXTENSIONS_SCAN):
             raise RuntimeError("Filename extension is not valid scan file.")
 
-        # (Xavier: replaced .bin with .npy and size modified)
+        # (Xavier: replaced .bin with .npy)
         scan = np.load(filename)
+        # x y z r (normally r is filled with 1)
         scan = scan.reshape((-1, 3))
-
         # put in attribute
         points = scan[:, 0:3]  # get xyz
         """
@@ -97,22 +101,22 @@ class LaserScan:
         """
         hom_points = np.ones((scan.shape[0], 4))
         hom_points[:, :-1] = points
-        # (Xavier : Need to check)
-        if if_transform:
-            points_transformed = np.linalg.inv(
-                from_pose).dot(to_pose).dot(hom_points.T).T
+
+        if need_transform:
+            points_transformed = (
+                pose_to_local@(pose_to_global@hom_points.T)).T
         else:
             points_transformed = hom_points
         """"""
         points = points_transformed[:, :3]
-        # (Xavier : what's this ?)
         remissions = np.ones((scan.shape[0]))  # get remission
         if self.drop_points is not False:
+            # randomly select remissions * total-size points and remove them
+            # (Xavier: what if repeat index ? seem sort inside)
             self.points_to_drop = np.random.randint(
                 0, len(points)-1, int(len(points)*self.drop_points))
             points = np.delete(points, self.points_to_drop, axis=0)
             remissions = np.delete(remissions, self.points_to_drop, axis=0)
-
         self.set_points(points, remissions)
 
     def open_scan_vis(self, filename):
@@ -157,6 +161,7 @@ class LaserScan:
         if self.flip_sign:
             self.points[:, 1] = -self.points[:, 1]
         if self.DA:
+            # (Xavier: DA meaning Data Augmentation lol)
             jitter_x = random.uniform(-5, 5)
             jitter_y = random.uniform(-3, 3)
             jitter_z = random.uniform(-1, 0)
@@ -186,6 +191,9 @@ class LaserScan:
         fov_up = self.proj_fov_up / 180.0 * np.pi  # field of view up in rad
         fov_down = self.proj_fov_down / 180.0 * np.pi  # field of view down in rad
         fov = abs(fov_down) + abs(fov_up)  # get field of view total in rad
+        # (Xavier: horizontal fov)
+        fov_h = self.proj_fov_horizontal / 180.0 * np.pi
+        demi_fov_h = fov_h / 2
 
         # get depth of all points
         depth = np.linalg.norm(self.points, 2, axis=1)
@@ -200,7 +208,10 @@ class LaserScan:
         pitch = np.arcsin(scan_z / depth)
 
         # get projections in image coords
-        proj_x = 0.5 * (yaw / np.pi + 1.0)  # in [0.0, 1.0]
+        # proj_x = 0.5 * (yaw / np.pi + 1.0)  # in [0.0, 1.0]
+        # (Xavier: horizontal fov)
+        # [-pi, pi] -> [-fov_h/2, fov_h/2]
+        proj_x = (yaw + demi_fov_h) / fov_h
         proj_y = 1.0 - (pitch + abs(fov_down)) / fov  # in [0.0, 1.0]
 
         # scale to image size using angular resolution
@@ -245,9 +256,9 @@ class SemLaserScan(LaserScan):
     # (Xavier: replaced .label with .npy)
     EXTENSIONS_LABEL = ['.npy']
 
-    def __init__(self, sem_color_dict=None, project=False, H=64, W=1024, fov_up=3.0, fov_down=-25.0, max_classes=300, DA=False, flip_sign=False, drop_points=False):
+    def __init__(self, sem_color_dict=None, project=False, H=64, W=1024, fov_up=3.0, fov_down=-25.0, fov_horizontal=120.0, max_classes=300, DA=False, flip_sign=False, drop_points=False):
         super(SemLaserScan, self).__init__(project, H, W, fov_up,
-                                           fov_down, DA=DA, flip_sign=flip_sign, drop_points=drop_points)
+                                           fov_down, fov_horizontal, DA=DA, flip_sign=flip_sign, drop_points=drop_points)
         self.reset()
 
         # make semantic colors
@@ -294,7 +305,6 @@ class SemLaserScan(LaserScan):
                                        dtype=np.int32)  # [H,W]  label
         self.proj_sem_color = np.zeros((self.proj_H, self.proj_W, 3),
                                        dtype=np.float)  # [H,W,3] color
-        # (Xavier : useless ?)
         # instance labels
         self.inst_label = np.zeros((0, 1), dtype=np.int32)  # [m, 1]: label
         self.inst_label_color = np.zeros(
@@ -345,13 +355,12 @@ class SemLaserScan(LaserScan):
         label = np.fromfile(filename, dtype=np.uint32)
         # label = label.reshape(-1, 1)
 
-
         if self.drop_points is not False:
             label = np.delete(label, self.points_to_drop, axis=0)
         # set it
         # assert(label.shape[1] == 1)
         self.set_pre_label(label)
-        
+
     def set_label(self, label):
         """ Set points for label not from file but from np
         """
@@ -400,7 +409,6 @@ class SemLaserScan(LaserScan):
         self.sem_label_color = self.sem_color_lut[self.sem_label]
         self.sem_label_color = self.sem_label_color.reshape((-1, 3))
 
-        # (Xavier : useless ?)
         self.inst_label_color = self.inst_color_lut[self.inst_label]
         self.inst_label_color = self.inst_label_color.reshape((-1, 3))
 
@@ -412,7 +420,6 @@ class SemLaserScan(LaserScan):
         self.proj_sem_label[mask] = self.sem_label[self.proj_idx[mask]]
         self.proj_sem_color[mask] = self.sem_color_lut[self.sem_label[self.proj_idx[mask]]]
 
-        # (Xavier : useless ?)
         # instances
         self.proj_inst_label[mask] = self.inst_label[self.proj_idx[mask]]
         self.proj_inst_color[mask] = self.inst_color_lut[self.inst_label[self.proj_idx[mask]]]

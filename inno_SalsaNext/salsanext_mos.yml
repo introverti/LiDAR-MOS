@@ -45,14 +45,15 @@ post:
 ################################################################################
 # dataset (to find parser)
 dataset:
-  labels: "waymo"
-  scans: "waymo"
-  max_points: 180000 # max of any scan in dataset
+  labels: "Innovusion"
+  scans: "Innovusion"
+  max_points: 200000 # max of any scan in dataset
   sensor:
-    name: "HDL64"
+    name: "Falcon"
     type: "spherical" # projective
-    fov_up: 18
-    fov_down: 3
+    fov_up: 15
+    fov_down: -15
+    fov_horizontal: 120
     img_prop:
       width: 2048
       height: 64

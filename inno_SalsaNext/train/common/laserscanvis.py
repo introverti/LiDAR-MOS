@@ -72,6 +72,7 @@ class LaserScanVis:
       # self.inst_view.camera.link(self.scan_view.camera)
 
     # img canvas size
+    # (TODO(Xaiver): need to adapt W and H)
     self.multiplier = 1
     self.canvas_W = 1024
     self.canvas_H = 64
@@ -125,8 +126,10 @@ class LaserScanVis:
 
   def update_scan(self):
     # first open data
+    #(TODO(Xavier) : check here)
     self.scan.open_scan_vis(self.scan_names[self.offset])
     if self.semantics:
+      #(TODO(Xavier) : check here)
       self.scan.open_pre_label(self.label_names[self.offset])
       self.scan.colorize()
 

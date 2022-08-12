@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import pickle
 from torch.utils.data import Dataset
+from scipy.spatial.transform import Rotation as R
 from common.laserscan import LaserScan, SemLaserScan
 import torchvision
 
@@ -25,9 +26,11 @@ EXTENSIONS_SCAN = ['.npy']
 EXTENSIONS_LABEL = ['.npy']
 EXTENSIONS_RESIDUAL = ['.npy']
 
+
 def trace(*txt):
     for item in txt:
         print("\033[0;37;41m\t" + str(txt) + "\033[0m")
+
 
 def is_scan(filename):
     return any(filename.endswith(ext) for ext in EXTENSIONS_SCAN)
@@ -73,7 +76,7 @@ def my_collate(batch):
     return data, project_mask, proj_labels
 
 
-class SemanticKitti(Dataset):
+class SemanticInnovusion(Dataset):
 
     def __init__(self, root,    # directory where data is
                  sequences,     # sequences for this data (e.g. [1,3,4,6])
@@ -101,6 +104,7 @@ class SemanticKitti(Dataset):
                                             dtype=torch.float)
         self.sensor_fov_up = sensor["fov_up"]
         self.sensor_fov_down = sensor["fov_down"]
+        self.sensor_fov_horizontal = sensor["fov_horizontal"]
         self.max_points = max_points
         self.gt = gt
         self.transform = transform
@@ -160,7 +164,8 @@ class SemanticKitti(Dataset):
             print("parsing seq {}".format(seq))
 
             # get paths for each
-            scan_path = os.path.join(self.root, seq, "lidars")
+            # (Xaiver: meaningless change)
+            scan_path = os.path.join(self.root, seq, "falcon")
             label_path = os.path.join(self.root, seq, "labels")
 
             if self.use_residual:
@@ -184,11 +189,24 @@ class SemanticKitti(Dataset):
             """
       Get poses and transform them to LiDAR coord frame for transforming point clouds
       """
-            # (Xavier : replace pose.txt with pose.npy)
-            poses_file = os.path.join(self.root, seq, "poses.npy")
-            poses_list = np.load(poses_file)
-            pose = poses_list.reshape((poses_list.shape[0], 4, 4))
-            self.poses[seq] = np.array(pose)
+            # (Xavier : rechange to txt)
+            poses_file = os.path.join(self.root, seq, "poses.txt")
+            poses_list = np.loadtxt(poses_file)
+            # (quaternion to rtmatrix)
+            poses = []
+            row4 = np.array([0, 0, 0, 1]).reshape(1, 4)
+            for line in poses_list:
+                timestamp = line[0]  # unused
+                current_t = np.array([line[1], line[2], line[3]]).reshape(3, 1)
+                current_r = np.array([line[4], line[5], line[6], line[7]])
+                current_R = R.from_quat(current_r)
+                current_rt = np.hstack((current_R.as_matrix(), current_t))
+                current_rt = np.vstack((current_rt, row4))
+                poses.append(current_rt)
+            poses = np.array(poses, dtype=np.float32).reshape(-1, 4, 4)
+
+            # pose = poses_list.reshape((poses_list.shape[0], 4, 4))
+            self.poses[seq] = np.array(poses)
 
             # check all scans have labels
             if self.gt:
@@ -244,10 +262,11 @@ class SemanticKitti(Dataset):
                     exec("residual_file_" + str(i+1) + " = " +
                          "self.residual_files_" + str(i+1) + "[seq][index]")
 
-            index_pose = self.poses[seq][index]
+            previous_pose = self.poses[seq][index]
+            previous_pose_inverse = np.linalg.inv(previous_pose)
 
             # open a semantic laserscan
-            DA = False
+            DA = False  # data augmentation
             flip_sign = False
             rot = False
             drop_points = False
@@ -268,6 +287,7 @@ class SemanticKitti(Dataset):
                                     W=self.sensor_img_W,
                                     fov_up=self.sensor_fov_up,
                                     fov_down=self.sensor_fov_down,
+                                    fov_horizontal=self.sensor_fov_horizontal,
                                     DA=DA,
                                     flip_sign=flip_sign,
                                     drop_points=drop_points)
@@ -277,14 +297,17 @@ class SemanticKitti(Dataset):
                                  W=self.sensor_img_W,
                                  fov_up=self.sensor_fov_up,
                                  fov_down=self.sensor_fov_down,
+                                 fov_horizontal=self.sensor_fov_horizontal,
                                  DA=DA,
                                  rot=rot,
                                  flip_sign=flip_sign,
                                  drop_points=drop_points)
 
             # open and obtain (transformed) scan
-            scan.open_scan(scan_file, index_pose, current_pose,
-                           if_transform=self.transform_mod)
+            scan.open_scan(scan_file,
+                           pose_to_global=previous_pose_inverse,
+                           pose_to_local=current_pose,
+                           need_transform=self.transform_mod)
 
             if self.gt:
                 scan.open_label(label_file)
@@ -355,6 +378,7 @@ class SemanticKitti(Dataset):
         path_norm = os.path.normpath(scan_file)
         path_split = path_norm.split(os.sep)
         path_seq = path_split[-3]
+        # (TODO(Xavier) : perhapes need to check)
         path_name = path_split[-1].replace(".bin", ".label")
 
         # return
@@ -433,7 +457,7 @@ class Parser():
 
         # Data loading code
         if self.split == 'train':
-            self.train_dataset = SemanticKitti(root=self.root,
+            self.train_dataset = SemanticInnovusion(root=self.root,
                                                sequences=self.train_sequences,
                                                labels=self.labels,
                                                color_map=self.color_map,
@@ -453,7 +477,7 @@ class Parser():
             assert len(self.trainloader) > 0
             self.trainiter = iter(self.trainloader)
 
-            self.valid_dataset = SemanticKitti(root=self.root,
+            self.valid_dataset = SemanticInnovusion(root=self.root,
                                                sequences=self.valid_sequences,
                                                labels=self.labels,
                                                color_map=self.color_map,
@@ -472,7 +496,7 @@ class Parser():
             self.validiter = iter(self.validloader)
 
         if self.split == 'valid':
-            self.valid_dataset = SemanticKitti(root=self.root,
+            self.valid_dataset = SemanticInnovusion(root=self.root,
                                                sequences=self.valid_sequences,
                                                labels=self.labels,
                                                color_map=self.color_map,
@@ -492,7 +516,7 @@ class Parser():
 
         if self.split == 'test':
             if self.test_sequences:
-                self.test_dataset = SemanticKitti(root=self.root,
+                self.test_dataset = SemanticInnovusion(root=self.root,
                                                   sequences=self.test_sequences,
                                                   labels=self.labels,
                                                   color_map=self.color_map,
@@ -551,14 +575,14 @@ class Parser():
 
     def to_original(self, label):
         # put label in original values
-        return SemanticKitti.map(label, self.learning_map_inv)
+        return SemanticInnovusion.map(label, self.learning_map_inv)
 
     def to_xentropy(self, label):
         # put label in xentropy values
-        return SemanticKitti.map(label, self.learning_map)
+        return SemanticInnovusion.map(label, self.learning_map)
 
     def to_color(self, label):
         # put label in original values
-        label = SemanticKitti.map(label, self.learning_map_inv)
+        label = SemanticInnovusion.map(label, self.learning_map_inv)
         # put label in color
-        return SemanticKitti.map(label, self.color_map)
+        return SemanticInnovusion.map(label, self.color_map)

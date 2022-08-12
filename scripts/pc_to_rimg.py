@@ -1,17 +1,13 @@
+from operator import truediv
 import os
 import sys
 import yaml
-import pickle
 import numpy as np
 from tqdm import tqdm
+from scipy.spatial.transform import Rotation as R
 import matplotlib.pyplot as plt
 from utils import *
 
-try:
-    from c_gen_virtual_scan import gen_virtual_scan as range_projection
-except:
-    print("Using clib by $export PYTHONPATH=$PYTHONPATH:<path-to-library>")
-    print("Currently using python-lib to generate range images.")
 
 if __name__ == '__main__':
     # load config file
@@ -30,31 +26,41 @@ if __name__ == '__main__':
     num_frames = config['num_frames']
     normalize = config['normalize']
     num_last_n = config['num_last_n']
-    output_folder = config['Kitti_format_data_folder']
+    output_folder = config['output_folder']
     visualize = config['visualize']
 
     range_image_params = config['range_image']
 
     scenes = os.listdir(output_folder)
     scenes.sort()
-    
+
     for scene in scenes:
         scene_folder = os.path.join(output_folder, scene)
         # Poses
-        poses_file = os.path.join(scene_folder, "poses.npy")
+        poses_file = os.path.join(scene_folder, "poses.txt")
         if not exist(poses_file):
             print("Cannot find poses file", poses_file)
             continue
-        poses_list = np.load(poses_file)
-        poses = poses_list.reshape((poses_list.shape[0],4,4))
+        # ts tx ty tz qx qy qz qw
+        poses_list = np.loadtxt(poses_file).reshape(-1, 8)
+        poses = []
+        row4 = np.array([0, 0, 0, 1]).reshape(1, 4)
+        for line in poses_list:
+            timestamp = line[0]
+            current_t = np.array([line[1], line[2], line[3]]).reshape(3, 1)
+            current_r = np.array([line[4], line[5], line[6], line[7]])
+            current_R = R.from_quat(current_r)
+            current_rt = np.hstack((current_R.as_matrix(), current_t))
+            current_rt = np.vstack((current_rt, row4))
+            poses.append(current_rt)
+        poses = np.array(poses, dtype=np.float32).reshape(-1, 4, 4)
 
         # Lidars
-        scans_folder = os.path.join(scene_folder, "lidars")
+        scans_folder = os.path.join(scene_folder, "falcon")
         if not exist(scans_folder):
             print("Cannot find lidar scan pc file", scans_folder)
             continue
         scans_paths = load_files(scans_folder)
-        scans_paths.sort()
 
         # # Lables
         # labels_folder = os.path.join(scene_folder, "labels")
@@ -87,7 +93,7 @@ if __name__ == '__main__':
         for frame_idx in tqdm(range(len(scans_paths))):
             file_name = os.path.join(
                 residual_image_folder, str(frame_idx).zfill(6))
-            
+
             # frame_name = os.path.join(
             #     scans_folder, str(frame_idx).zfill(6))
             # label_name = os.path.join(
@@ -110,16 +116,18 @@ if __name__ == '__main__':
 
                 current_range = range_projection(current_scan.astype(np.float32),
                                                  range_image_params['height'], range_image_params['width'],
-                                                 range_image_params['fov_up'], range_image_params['fov_down'],
+                                                 range_image_params['fov_up'], range_image_params[
+                                                     'fov_down'], range_image_params['fov_horizontal'],
                                                  range_image_params['max_range'], range_image_params['min_range'])[:, :, 3]
                 # load last scan, transform into the current coord and generate a transformed last range image
                 last_pose = poses[frame_idx - num_last_n]
                 last_scan = load_vertex(scans_paths[frame_idx - num_last_n])
                 # (Xavier: align last scan to current coordinate)
-                last_scan_transformed = np.linalg.inv(last_pose).dot(current_pose).dot(last_scan.T).T
+                last_scan_transformed = (current_pose@np.linalg.inv(last_pose)@last_scan.T).T
                 last_range_transformed = range_projection(last_scan_transformed.astype(np.float32),
                                                           range_image_params['height'], range_image_params['width'],
-                                                          range_image_params['fov_up'], range_image_params['fov_down'],
+                                                          range_image_params['fov_up'], range_image_params[
+                                                              'fov_down'], range_image_params['fov_horizontal'],
                                                           range_image_params['max_range'], range_image_params['min_range'])[:, :, 3]
                 # generate residual image
                 valid_mask = (current_range > range_image_params['min_range']) & \

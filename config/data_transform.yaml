@@ -9,27 +9,24 @@ num_frames: -1
 # normalize/scale the difference with corresponding range value
 normalize: True
 # use the last n frame to calculate the difference image
-num_last_n: 1
+num_last_n: 2
 
 # Inputs
-# inno or waymo
-type: "waymo"
-# the folder of Waymo or inno data
-source_folder: 'data/waymo/'
-# Waymo have 5 liadrs, we only use the center one
-lidar_name: 0
+type: "Falcon"
+# the folder of source data
+input_folder: 'data/falcon'
 
 # Outputs
 # the suffix should be the same as num_last_n!
-Kitti_format_data_folder: 'data/own/sequences'
-visualize: False
+output_folder: 'data/falcon/sequences'
+visualize: True
 
 # range image parameters
 range_image:
   height: 64
   width: 2048
-  # TOP [-17.6, +2.4]
-  fov_up: 18
-  fov_down: 3
-  max_range: 200.0
+  fov_up: 15
+  fov_down: 15
+  fov_horizontal: 120
+  max_range: 300
   min_range: 2.0

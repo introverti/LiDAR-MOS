@@ -1,0 +1,12 @@
+adapte parameters in salsanext_mos.yml
+label yaml need labeled data
+/home/xavier/repos/LiDAR-MOS-WAYMO/inno_SalsaNext/train/common/laserscan.py Checked
+/home/xavier/repos/LiDAR-MOS-WAYMO/inno_SalsaNext/train/common/laserscanvis.py not Yet
+/home/xavier/repos/LiDAR-MOS-WAYMO/inno_SalsaNext/train/tasks/semantic/dataset/innovusion/parser.py
+
+
+NVIDIA GeForce RTX 3070 Laptop GPU with CUDA capability sm_86 is not compatible with the current PyTorch installation.
+The current PyTorch install supports CUDA capabilities sm_37 sm_50 sm_60 sm_61 sm_70 sm_75 compute_37.
+If you want to use the NVIDIA GeForce RTX 3070 Laptop GPU GPU with PyTorch, please check the instructions at https://pytorch.org/get-started/locally/
+
+  warnings.warn(incompatible_device_warn.format(device_name, capability, " ".join(arch_list), device_name))

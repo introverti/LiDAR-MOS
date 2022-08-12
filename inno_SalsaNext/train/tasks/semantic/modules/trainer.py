@@ -38,7 +38,6 @@ def one_hot_pred_from_label(y_pred, labels):
     indexes = [l for l in labels]
     y_true[torch.arange(labels.size(0)), indexes] = ones[torch.arange(
         labels.size(0)), indexes]
-
     return y_true
 
 
@@ -162,7 +161,7 @@ class Trainer():
             self.model_single = self.model.module  # single model to get weight names
             self.multi_gpu = True
             self.n_gpus = torch.cuda.device_count()
-        
+
         # loss defined here
         # self.criterion = nn.NLLLoss(
         #     weight=self.loss_w, reduction='mean').to(self.device)
